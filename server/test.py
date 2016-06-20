@@ -27,6 +27,7 @@ import time
 import socket
 import atexit
 import sys
+import logging
 
 try:
     import cStringIO as StringIO
@@ -38,272 +39,9 @@ from traceback import print_exception
 from server.header import ResponseHeaders
 from server.header import format_date_time
 
-
-# class RequestHadler(object):
-#
-#     http_version = "1.1"
-#     server_software = "Test Server"
-#
-#     error_status = "500 Internal Server Error"
-#     error_headers = [('Content-Type', 'text/plain')]
-#     error_body = "A server error occurred.  Please contact the administrator."
-#
-#     def __init__(self, server, rfile, wfile, addr):
-#
-#         self.rfile = rfile
-#         self.wfile = wfile
-#         self.stderr = sys.stderr
-#
-#         self.addr = addr
-#         self.server = server
-#
-#         self.application = server.application
-#
-#         self.environ = None
-#
-#         self.__commond = None
-#         self.__path = None
-#         self.__query = None
-#         self.__version = None
-#         self.__header = []
-#         self.__body = None
-#
-#         self.request_startline = None
-#
-#         # For write() and startResponse()
-#         self.result = None
-#         self.header_sent = False
-#         self.response_status = None
-#         self.response_header = None
-#         self.bytes_sent = 0
-#
-#     def handle_one_request(self):
-#         """ Main function of the handler.
-#         parse_request -> run() -> close()
-#         :return: None
-#         """
-#         self.request_startline = self.rfile.readline(65537)
-#         self.parse_request()
-#         self.run()
-#         self.rfile.close()
-#         self.wfile.close()
-#
-#     def parse_request(self):
-#         """ Parse the request content """
-#         startline = self.request_startline.replace('\r\n', '\n').replace('\r', '\n')
-#         # Parse the first line of request
-#         self.__commond, self.__path, self.__query, self.__version = self.__parse_startline(startline)
-#         # Get the header from request
-#         self.__header = Message(self.rfile)
-#
-#     @staticmethod
-#     def __parse_startline(startline):
-#         """ Parse the first line of request
-#         To get commond(e.g: GET, POST....),
-#         path,
-#         query(e.g:?user=user)
-#         version(The version of HTTP request, e.g:HTTP/1.1)
-#         """
-#         commond, path, version = startline.split()
-#         if '?' in path:
-#             path, query = path.split("?", 1)
-#         else:
-#             path, query = path, ""
-#
-#         return commond, path, query, version
-#
-#     def run(self):
-#         try:
-#             environ = self.getenv()
-#             self.result = self.application(environ, self.start_response)
-#             self.finish_response()
-#         except:
-#             try:
-#                 self.handle_error()
-#             except:
-#                 self.close()
-#
-#     def set_cgi_environ(self, environ):
-#         """ Setting the cgi environ """
-#         # Request http version
-#         environ['SERVER_PROTOCOL'] = self.__version
-#         environ['REQUEST_METHOD'] = self.__commond
-#         environ['PATH_INFO'] = self.__path
-#         environ['QUERY_STRING'] = self.__query
-#
-#         if self.__header.typeheader is None:
-#             environ['CONTENT_TYPE'] = self.__header.type
-#         else:
-#             environ['CONTENT_TYPE'] = self.__header.typeheader
-#
-#         length = self.__header.getheader('content_length')
-#         if length:
-#             environ["CONTENT_LENGTH"] = length
-#
-#         for h in self.__header.headers:
-#             k, v = h.split(":", 1)
-#             k = k.replace("-", "_").upper();
-#             v = v.strip()
-#             if k in environ:
-#                 continue
-#             if "HTTP_" + k in environ:
-#                 environ["HTTP_" + k] += "," + v
-#             else:
-#                 environ["HTTP_" + k] = v
-#
-#     def getenv(self):
-#         """ Get the environ """
-#         environ = self.server.base_environ.copy()
-#         environ["wsgi.version"] = (1, 0)
-#         environ["wsgi.input"] = self.rfile
-#         environ["wsgi.error"] = self.wfile
-#         environ["wsgi.multithread"] = False
-#         environ["wsgi.multiprocess"] = False
-#         environ["wsgi.run_once"] = False
-#
-#         if environ.get("HTTPS", "off") in ("on", "1"):
-#             environ["wsgi.url_scheme"] = "https"
-#         else:
-#             environ["wsgi.url_scheme"] = "http"
-#
-#         if self.server_software:
-#             environ['SERVER_SOFTWARE'] = self.server_software
-#
-#         # CGI environ
-#         self.set_cgi_environ(environ)
-#
-#         self.environ = environ
-#         return environ
-#
-#     def finish_response(self):
-#         """ Send the iterable data, then close self and the iterable data
-#         """
-#         try:
-#             for data in self.result:
-#                 self.write(data)
-#             self.finish_content()
-#         finally:
-#             self.close()
-#
-#     def close(self):
-#         """ Close the the iterable """
-#         if hasattr(self.result, "close"):
-#             self.result.close()
-#
-#     def finish_content(self):
-#         """Ensure headers and content have both been sent"""
-#         if not self.header_sent:
-#             # Only zero Content-Length if not set by the application (so
-#             # that HEAD requests can be satisfied properly, see #3839)
-#             if self.response_header.get('Content-Length') is None:
-#                 self.response_header.add_header('Content-Length', 0)
-#             self.send_headers()
-#         else:
-#             pass # XXX check if content-length was too short?
-#
-#     def write(self, data):
-#         if not self.response_status:
-#             raise AssertionError("write() before start_response()")
-#         if not self.header_sent:
-#             self.bytes_sent = len(data)
-#             self.send_headers()
-#         else:
-#             self.bytes_sent += len(data)
-#
-#         self._write(data)
-#         self._flush()
-#
-#     def send_headers(self):
-#         """ Send response header to client """
-#         self.header_sent = True
-#         self.setup_header()
-#
-#         self.send_preamble()
-#         self._write(self.response_header)
-#
-#     def setup_header(self):
-#         """ Make necessary header changes """
-#         if "Content-Length" not in self.__header:
-#             self.set_content_length()
-#
-#     def set_content_length(self):
-#         """ Get the Content-Length if possible """
-#         if 'Content-Length' not in self.response_header:
-#             try:
-#                 blocks = len(self.result)
-#             except (TypeError,AttributeError,NotImplementedError):
-#                 pass
-#             else:
-#                 if blocks == 1:
-#                     self.response_header["Content-Length"] = str(self.bytes_sent)
-#
-#     def send_preamble(self):
-#         """ Send version/status/date/server to client """
-#         self._write('%s %s\r\n' % (self.version, self.response_status))
-#         if "Date" not in self.response_header:
-#             self._write("Date: %s\r\n" % format_date_time(time.time()))
-#
-#         if self.server_software and "Server" not in self.response_header:
-#             self._write("Server: %s\r\n" % self.server_software)
-#
-#     def _write(self, data):
-#         self.wfile.write(data)
-#         self._write = self.wfile.write
-#
-#     def _flush(self):
-#         self.wfile.flush()
-#         self._flush = self.wfile.flush
-#
-#     def start_response(self, status, response_headers, excInfo=None):
-#         if excInfo:
-#             try:
-#                 if self.header_sent:
-#                     raise (excInfo[0], excInfo[1], excInfo[2])
-#             finally:
-#                 excInfo = None
-#         elif self.header_sent:
-#             raise AssertionError("Headers already set!")
-#
-#         self.response_status = status
-#         self.response_header = ResponseHeaders(response_headers)
-#         return self.write
-#
-#     def handle_error(self):
-#         """ Send error output to client if possible """
-#         self.log_exception(sys.exc_info())
-#         if not self.header_sent:
-#             self.result = self.error_output(self.environ, self.start_response)
-#             self.finish_response()
-#
-#     def log_exception(self, exc_info):
-#         """
-#         Log the exc_info to server log by stderr
-#         Can override this method to change the format
-#         :param exc_info:
-#         """
-#         try:
-#             print_exception(exc_info[0], exc_info[1], exc_info[2], None, self.stderr)
-#         finally:
-#             exc_info = None
-#
-#
-#     def error_output(self, environ, start_response):
-#         """
-#
-#         :param environ:
-#         :param start_response:
-#         :return error_body:
-#         """
-#         start_response(self.error_status, self.error_headers, sys.exc_info())
-#         return [self.error_body]
-#
-#     def set_stderr(self, stderr):
-#         """
-#         Set the stderr for error out put
-#         :param stderr:
-#         :return:
-#         """
-#         self.stderr = stderr
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s : ',
+                    datefmt='%a, %d %b %Y %H:%M:%S')
 
 
 class HTTPRequest(object):
@@ -342,10 +80,8 @@ class HTTPRequest(object):
             self.handle_request()
         except Exception as ex:
             # print log here
-            print(ex)
-            response = SimpleResponse(500, self.version, [('Content-Type', 'text/plain',), ], "")
-            self.__write(response)
-            self.__flush()
+            logging.error(ex)
+            self.send_simple_response(500)
         finally:
             self.close()
 
@@ -356,10 +92,17 @@ class HTTPRequest(object):
         start_line = self.rfile.readline(HTTPRequest.MAX_URL_SIZE)
         start_line = start_line.replace('\r\n', '\n').replace('\r', '\n')
         self.commond, self.path, self.query, self.version = HTTPRequest.__parse_startline(start_line)
-
+        logging.debug(start_line)
         self.headers = HTTPRequest.__parse_header(self.rfile)
+        logging.debug(self.headers)
+
+        # Process 'Expect' header with value "100-continue"
+        if self.headers.get("Expect") is not None and self.headers.get("Expect") == "100-continue":
+            self.send_simple_response(100)
+
         content_length = int(self.headers.get("Content-Length", 0))
         self.body = HTTPRequest.__parse_body(self.rfile, content_length)
+        logging.debug(self.body.getvalue())
 
     def handle_request(self):
         """
@@ -375,7 +118,6 @@ class HTTPRequest(object):
         :param start_line:
         :return: (commond, path, query, http version)
         """
-        print(start_line)
         commond, path, version = start_line.split(' ')
         if '?' in path:
             path, query = path.split('?', 1)
@@ -406,11 +148,16 @@ class HTTPRequest(object):
 
     @staticmethod
     def __parse_body(rfile, content_length=0):
-        body = None
-        #length = HTTPRequest.MAX_BODY_SIZE
+        body = StringIO.StringIO()
         if content_length != 0 and content_length <= HTTPRequest.MAX_BODY_SIZE:
-            # length = content_length
-            body = rfile.read(content_length)
+            body.write(rfile.read(content_length))
+        # else:
+        #     length = 0
+        #     for line in rfile:
+        #         if len(line) + length <= HTTPRequest.MAX_BODY_SIZE:
+        #             body.write(line)
+        #         else:
+        #             break
 
         return body
 
@@ -436,6 +183,16 @@ class HTTPRequest(object):
         self.rfile.close()
         self.wfile.close()
 
+    def send_simple_response(self, status, header=[('Content-Type', 'text/plain',), ]):
+        """
+        Return a simple response to client
+        :param status: the status code
+        :param header: http header
+        :return:
+        """
+        response = SimpleResponse(status, self.version, header, "")
+        self.__write(response)
+        self.__flush()
 
 class WSGIRequest(HTTPRequest):
 
@@ -477,7 +234,7 @@ class WSGIRequest(HTTPRequest):
         """ Get the environ """
         environ = self.server.base_environ.copy()
         environ["wsgi.version"] = (1, 0)
-        environ["wsgi.input"] = self.rfile
+        environ["wsgi.input"] = self.body
         environ["wsgi.error"] = self.wfile
         environ["wsgi.multithread"] = False
         environ["wsgi.multiprocess"] = False
@@ -533,6 +290,7 @@ class WSGIRequest(HTTPRequest):
             raise AssertionError("Headers already set!")
 
         self.response_status = status
+        logging.debug(response_headers)
         self.response_headers = ResponseHeaders(response_headers)
         return self.write
 
@@ -750,8 +508,9 @@ class SimpleResponse(object):
         # write body
         if self.body is not None:
             output.write(str(self.body))
-
-        return output.getvalue()
+        oputstr = output.getvalue()
+        output.close()
+        return oputstr
 
     def __str__(self):
         return self.to_string()
@@ -825,9 +584,9 @@ class WSGIServer(object):
 
 
 if __name__ == "__main__":
-    server = WSGIServer(WSGIRequest, "", 8887)
+    server = WSGIServer(WSGIRequest, "192.168.123.129", 8888)
     # server = WSGIServer(HTTPRequest, '', 8888)
-    from server.djangoapp import app
+    from server.helloworld.helloworld.wsgi import application as app
     atexit.register(server.close)
     server.set_app(app)
     print("start")
