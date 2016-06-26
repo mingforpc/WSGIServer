@@ -28,15 +28,15 @@ import socket
 import atexit
 import sys
 import logging
+import errno
 
 try:
     import cStringIO as StringIO
 except (Exception, ):
     import StringIO
 
-from mimetools import Message
 from traceback import print_exception
-from server.header import ResponseHeaders
+from server.header import ResponseHeaders, RequestHeaders
 from server.header import format_date_time
 
 logging.basicConfig(level=logging.DEBUG,
@@ -93,7 +93,7 @@ class HTTPRequest(object):
         start_line = start_line.replace('\r\n', '\n').replace('\r', '\n')
         self.commond, self.path, self.query, self.version = HTTPRequest.__parse_startline(start_line)
         logging.debug(start_line)
-        self.headers = HTTPRequest.__parse_header(self.rfile)
+        self.headers = RequestHeaders(HTTPRequest.__parse_header(self.rfile))
         logging.debug(self.headers)
 
         # Process 'Expect' header with value "100-continue"
@@ -151,13 +151,6 @@ class HTTPRequest(object):
         body = StringIO.StringIO()
         if content_length != 0 and content_length <= HTTPRequest.MAX_BODY_SIZE:
             body.write(rfile.read(content_length))
-        # else:
-        #     length = 0
-        #     for line in rfile:
-        #         if len(line) + length <= HTTPRequest.MAX_BODY_SIZE:
-        #             body.write(line)
-        #         else:
-        #             break
 
         return body
 
@@ -193,6 +186,7 @@ class HTTPRequest(object):
         response = SimpleResponse(status, self.version, header, "")
         self.__write(response)
         self.__flush()
+
 
 class WSGIRequest(HTTPRequest):
 
@@ -291,7 +285,7 @@ class WSGIRequest(HTTPRequest):
 
         self.response_status = status
         logging.debug(response_headers)
-        self.response_headers = ResponseHeaders(response_headers)
+        self.response_headers = ResponseHeaders.get_headers(response_headers)
         return self.write
 
     def write(self, data):
@@ -355,7 +349,7 @@ class WSGIRequest(HTTPRequest):
             # Only zero Content-Length if not set by the application (so
             # that HEAD requests can be satisfied properly, see #3839)
             if self.response_headers.get('Content-Length') is None:
-                self.response_headers.add_header('Content-Length', 0)
+                self.response_headers.set_header('Content-Length', 0)
             self.send_headers()
         else:
             pass  # XXX check if content-length was too short?
@@ -539,7 +533,7 @@ class WSGIServer(object):
             self.server_name = socket.getfqdn(host)
             self.setup_environ()
 
-        self.__socket.listen(2)
+        self.__socket.listen(5)
 
         self.running = False
 
@@ -547,17 +541,29 @@ class WSGIServer(object):
 
     def start(self):
         while True:
-            conn, addr = self.__socket.accept()
-            rfile = conn.makefile("rb")
-            wfile = conn.makefile("wb")
-            request_handler = self.handler(self, rfile, wfile, addr)
 
-            request_handler.handle_one_request()
-            conn.close()
+            accepted = False
+            try:
+                conn, addr = self.__socket.accept()
+                accepted = True
+            except socket.error as ex:
+                # (errno, string)
+                if ex[0] in (errno.EWOULDBLOCK,):
+                    pass
+                else:
+                    raise
+
+            if accepted:
+                rfile = conn.makefile("rb")
+                wfile = conn.makefile("wb")
+                request_handler = self.handler(self, rfile, wfile, addr)
+
+                request_handler.handle_one_request()
+                conn.close()
 
     def bind(self, host, port):
         """ Bind host and port to server socket """
-        if self.__running is False:
+        if self.running is False:
             self.__socket.bind((host, port))
             self.server_name = socket.getfqdn(host)
             self.setup_environ()
@@ -577,14 +583,19 @@ class WSGIServer(object):
         env['SERVER_NAME'] = self.server_name
         env['GATEWAY_INTERFACE'] = 'CGI/1.1'
         env['SERVER_PORT'] = str(self.port)
-        env['REMOTE_HOST']=''
-        env['CONTENT_LENGTH']=''
+        env['REMOTE_HOST'] = ''
+        env['CONTENT_LENGTH'] = ''
         env['SCRIPT_NAME'] = ''
         env['HTTPS'] = 'off'
 
+    def set_blocking(self, flag):
+        if self.running is False:
+            self.__socket.setblocking(flag)
+
 
 if __name__ == "__main__":
-    server = WSGIServer(WSGIRequest, "192.168.123.129", 8888)
+    server = WSGIServer(WSGIRequest, "0.0.0.0", 8887)
+    # server.set_blocking(0)
     # server = WSGIServer(HTTPRequest, '', 8888)
     from server.helloworld.helloworld.wsgi import application as app
     atexit.register(server.close)

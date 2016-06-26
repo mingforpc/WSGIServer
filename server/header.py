@@ -57,6 +57,9 @@ class Headers(object):
         """ get a header, if not exist than return None """
         return self.headers.get(item)
 
+    def __contains__(self, item):
+        return item in self.headers
+
     def __delitem__(self, key):
         """ remove a header """
         if self.headers.get(key) is not None:
@@ -86,10 +89,36 @@ class Headers(object):
         """ return True if has this header else return False """
         return self.headers.has_key(key)
 
+    def items(self):
+        return self.headers.items()
+
     def __str__(self):
         return '\r\n'.join(["%s: %s" % (k, v) for k, v in self.headers.items()] + ['', ''])
 
-        # class ResponseHeaders(object):
+
+class RequestHeaders(Headers):
+    """ The headers of request """
+    def __init__(self, headers=None):
+        super(RequestHeaders, self).__init__()
+        self.headers = headers
+
+
+class ResponseHeaders(Headers):
+    """ The headers of response """
+    def __init__(self):
+        super(ResponseHeaders, self).__init__()
+
+    @staticmethod
+    def get_headers(headers):
+        response_headers = ResponseHeaders()
+        for header in headers:
+            k, v = header
+            response_headers[k] = v
+
+        return response_headers
+
+
+# class ResponseHeaders(object):
 #     """ The class to manage the response headers """
 #     def __init__(self, headers):
 #         if type(headers) is not ListType:
