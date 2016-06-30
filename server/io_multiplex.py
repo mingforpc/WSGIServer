@@ -23,7 +23,50 @@ from __future__ import with_statement
 from __future__ import nested_scopes
 from __future__ import generators
 
-try:
-    from select import epoll as multiplexer
-except:
-    from select import select as multiplexer
+import select
+
+EPOLLIN = 0x001
+EPOLLPRI = 0x002
+EPOLLOUT = 0x004
+EPOLLRDNORM = 0x040
+EPOLLRDBAND = 0x080
+EPOLLWRNORM = 0x100
+EPOLLWRBAND = 0x200
+EPOLLMSG = 0x400
+EPOLLERR = 0x008
+EPOLLHUP = 0x010
+EPOLLONESHOT = (1 << 30)
+EPOLLET = (1 << 31)
+
+READ = EPOLLIN | EPOLLPRI | EPOLLRDNORM
+WRITE = EPOLLOUT | EPOLLWRNORM
+ERROR = EPOLLERR | EPOLLHUP | EPOLLMSG
+
+
+class _Select(object):
+
+    def __init__(self):
+        self.read_set = set()
+        self.write_set = set()
+        self.error_set = set()
+
+    def register(self, fd, eventmask):
+        pass
+
+    def fileno(self):
+        pass
+
+    def fromfd(self, fd):
+        pass
+
+    def close(self):
+        pass
+
+    def modify(self, fd, eventmask):
+        pass
+
+    def unregister(self, fd):
+        pass
+
+    def poll(self, timeout):
+        pass
