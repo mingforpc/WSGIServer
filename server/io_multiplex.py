@@ -43,6 +43,28 @@ WRITE = EPOLLOUT | EPOLLWRNORM
 ERROR = EPOLLERR | EPOLLHUP | EPOLLMSG
 
 
+class IOMultiplex(object):
+
+    @classmethod
+    def initialized(cls):
+        pass
+
+    def __init__(self):
+        self.loop = _epoll()
+
+        self._handler = {}
+
+    def add_handler(self, fd, handler, eventmask):
+        pass
+
+    def remove_handler(self, fd):
+        pass
+
+    def start(self):
+        pass
+
+
+
 class _Select(object):
 
     def __init__(self):
@@ -51,22 +73,55 @@ class _Select(object):
         self.error_set = set()
 
     def register(self, fd, eventmask):
-        pass
-
-    def fileno(self):
-        pass
-
-    def fromfd(self, fd):
-        pass
-
-    def close(self):
-        pass
+        if eventmask & READ:
+            self.read_set.add(fd)
+        elif eventmask & WRITE:
+            self.write_set.add(fd)
+        elif eventmask & ERROR:
+            self.error_set.add(fd)
 
     def modify(self, fd, eventmask):
-        pass
+        if fd in self.read_set and (eventmask & READ) == False:
+            self.read_set.remove(fd)
+
+        if fd in self.write_set and (eventmask & WRITE) == False:
+            self.read_set.remove(fd)
+
+        if fd in self.error_set and (eventmask & ERROR) == False:
+            self.read_set.remove(fd)
+
+        self.register(fd, eventmask)
 
     def unregister(self, fd):
-        pass
+        if fd in self.read_set:
+            self.read_set.remove(fd)
+
+        if fd in self.write_set:
+            self.read_set.remove(fd)
+
+        if fd in self.error_set:
+            self.read_set.remove(fd)
 
     def poll(self, timeout):
-        pass
+        read_list, write_list, error_list = select.select(self.read_set, self.write_set, self.error_set, timeout)
+
+        events = {}
+
+        for fd in read_list:
+            events[fd] = events.get(fd, 0) | READ
+
+        for fd in write_list:
+            events[fd] = events.get(fd, 0) | WRITE
+
+        for fd in error_list:
+            events[fd] = events.get(fd, 0) | ERROR
+
+        return events
+
+
+if hasattr(select, "epoll"):
+    _epoll = select.epoll()
+elif hasattr(select, "poll"):
+    _epoll = select.poll()
+else:
+    _epoll = _Select()
