@@ -1,4 +1,10 @@
+from celery import Celery
 
+app = Celery('tasks', backend="redis://172.17.0.4:6379/0", broker="redis://172.17.0.4:6379/0")
+
+@app.task
+def add(x, y):
+    return x + y
 
 def split_words():
     while True:
