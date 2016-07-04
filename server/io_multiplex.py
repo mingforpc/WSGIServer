@@ -24,6 +24,11 @@ from __future__ import nested_scopes
 from __future__ import generators
 
 import select
+import logging
+
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s : ',
+                    datefmt='%a, %d %b %Y %H:%M:%S')
 
 EPOLLIN = 0x001
 EPOLLPRI = 0x002
@@ -45,24 +50,50 @@ ERROR = EPOLLERR | EPOLLHUP | EPOLLMSG
 
 class IOMultiplex(object):
 
+    __multiplex = None
+
+    @classmethod
+    def __initialized(cls):
+
+        return cls.__multiplex if cls.__multiplex is not None else IOMultiplex()
+
     @classmethod
     def initialized(cls):
-        pass
+        return cls.__initialized()
 
     def __init__(self):
         self.loop = _epoll()
 
+        self.__events = {}
         self._handler = {}
 
+        self.running = False
+
+        self.timeout = 1
+
     def add_handler(self, fd, handler, eventmask):
-        pass
+        self._handler[fd] = handler
+        self.loop.register(fd, eventmask)
 
     def remove_handler(self, fd):
-        pass
+        del self._handler[fd]
+        self.loop.unregister(fd)
 
     def start(self):
-        pass
+        self.running = True
 
+        while self.running:
+            events = self.loop.poll(self.timeout)
+            self.__events.update(events)
+
+            for fd, event in self.__events.items():
+                try:
+                    self._handler[fd](fd, event)
+                except Exception as ex:
+                    logging.error(ex)
+
+    def stop(self):
+        self.running = False
 
 
 class _Select(object):
@@ -120,8 +151,13 @@ class _Select(object):
 
 
 if hasattr(select, "epoll"):
-    _epoll = select.epoll()
+    _epoll = select.epoll
 elif hasattr(select, "poll"):
-    _epoll = select.poll()
+    _epoll = select.poll
 else:
-    _epoll = _Select()
+    _epoll = _Select
+
+
+if __name__ == "__main__":
+    m = IOMultiplex.initialized()
+    m.start()

@@ -38,6 +38,7 @@ except (Exception, ):
 from traceback import print_exception
 from server.header import ResponseHeaders, RequestHeaders
 from server.header import format_date_time
+from server.io_multiplex import IOMultiplex
 
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s : ',
@@ -539,27 +540,33 @@ class WSGIServer(object):
 
         self.application = None
 
+        self.multiplex = IOMultiplex.initialized()
+
     def start(self):
-        while True:
+        pass
+        # while True:
+        #
+        #     accepted = False
+        #     try:
+        #         conn, addr = self.__socket.accept()
+        #         accepted = True
+        #     except socket.error as ex:
+        #         # (errno, string)
+        #         if ex[0] in (errno.EWOULDBLOCK,):
+        #             pass
+        #         else:
+        #             raise
+        #
+        #     if accepted:
+        #         rfile = conn.makefile("rb")
+        #         wfile = conn.makefile("wb")
+        #         request_handler = self.handler(self, rfile, wfile, addr)
+        #
+        #         request_handler.handle_one_request()
+        #         conn.close()
 
-            accepted = False
-            try:
-                conn, addr = self.__socket.accept()
-                accepted = True
-            except socket.error as ex:
-                # (errno, string)
-                if ex[0] in (errno.EWOULDBLOCK,):
-                    pass
-                else:
-                    raise
-
-            if accepted:
-                rfile = conn.makefile("rb")
-                wfile = conn.makefile("wb")
-                request_handler = self.handler(self, rfile, wfile, addr)
-
-                request_handler.handle_one_request()
-                conn.close()
+    def handle_connection(self, fd, event):
+        pass
 
     def bind(self, host, port):
         """ Bind host and port to server socket """
