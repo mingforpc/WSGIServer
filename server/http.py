@@ -542,8 +542,12 @@ class WSGIServer(object):
 
         self.multiplex = IOMultiplex.initialized()
 
+        self.connection_list = {}
+
     def start(self):
-        pass
+
+        self.multiplex.add_handler(fd=self.__socket.fileno(), handler=self.handle_connection,
+                                   eventmask=IOMultiplex.READ)
         # while True:
         #
         #     accepted = False
@@ -566,7 +570,27 @@ class WSGIServer(object):
         #         conn.close()
 
     def handle_connection(self, fd, event):
-        pass
+        try:
+            conn, addr = self.__socket.accept()
+            conn.setblocking(0)
+            self.connection_list[conn.fileno()] = (conn, addr)
+            self.multiplex.add_handler(fd=conn.fileno(), handler=self.handle_read_request, eventmask=IOMultiplex.READ)
+        except socket.error as ex:
+            print(ex)
+            if ex[0] in (errno.EWOULDBLOCK,):
+                pass
+            else:
+                raise
+
+    def handle_read_request(self, fd, event):
+        """ Temporarily function """
+        conn, addr = self.connection_list[fd]
+        rfile = conn.makefile("rb")
+        wfile = conn.makefile("wb")
+        request_handler = self.handler(self, rfile, wfile, addr)
+        request_handler.handle_one_request()
+        conn.close()
+        self.multiplex.remove_handler(fd)
 
     def bind(self, host, port):
         """ Bind host and port to server socket """
@@ -602,10 +626,12 @@ class WSGIServer(object):
 
 if __name__ == "__main__":
     server = WSGIServer(WSGIRequest, "0.0.0.0", 8887)
-    # server.set_blocking(0)
+    server.set_blocking(0)
     # server = WSGIServer(HTTPRequest, '', 8888)
     from server.helloworld.helloworld.wsgi import application as app
     atexit.register(server.close)
     server.set_app(app)
     print("start")
     server.start()
+    print("IO Started")
+    IOMultiplex.initialized().start()

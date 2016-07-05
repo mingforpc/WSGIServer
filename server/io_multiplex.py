@@ -43,19 +43,20 @@ EPOLLHUP = 0x010
 EPOLLONESHOT = (1 << 30)
 EPOLLET = (1 << 31)
 
-READ = EPOLLIN | EPOLLPRI | EPOLLRDNORM
-WRITE = EPOLLOUT | EPOLLWRNORM
-ERROR = EPOLLERR | EPOLLHUP | EPOLLMSG
-
 
 class IOMultiplex(object):
 
     __multiplex = None
 
+    READ = EPOLLIN | EPOLLPRI | EPOLLRDNORM
+    WRITE = EPOLLOUT | EPOLLWRNORM
+    ERROR = EPOLLERR | EPOLLHUP | EPOLLMSG
+
     @classmethod
     def __initialized(cls):
 
-        return cls.__multiplex if cls.__multiplex is not None else IOMultiplex()
+        cls.__multiplex = cls.__multiplex if cls.__multiplex is not None else IOMultiplex()
+        return cls.__multiplex
 
     @classmethod
     def initialized(cls):
@@ -84,13 +85,13 @@ class IOMultiplex(object):
 
         while self.running:
             events = self.loop.poll(self.timeout)
-            self.__events.update(events)
+            self.__events = events
 
             for fd, event in self.__events.items():
                 try:
                     self._handler[fd](fd, event)
                 except Exception as ex:
-                    logging.error(ex)
+                    logging.error(str(ex))
 
     def stop(self):
         self.running = False
@@ -104,21 +105,21 @@ class _Select(object):
         self.error_set = set()
 
     def register(self, fd, eventmask):
-        if eventmask & READ:
+        if eventmask & IOMultiplex.READ:
             self.read_set.add(fd)
-        elif eventmask & WRITE:
+        elif eventmask & IOMultiplex.WRITE:
             self.write_set.add(fd)
-        elif eventmask & ERROR:
+        elif eventmask & IOMultiplex.ERROR:
             self.error_set.add(fd)
 
     def modify(self, fd, eventmask):
-        if fd in self.read_set and (eventmask & READ) == False:
+        if fd in self.read_set and (eventmask & IOMultiplex.READ) == False:
             self.read_set.remove(fd)
 
-        if fd in self.write_set and (eventmask & WRITE) == False:
+        if fd in self.write_set and (eventmask & IOMultiplex.WRITE) == False:
             self.read_set.remove(fd)
 
-        if fd in self.error_set and (eventmask & ERROR) == False:
+        if fd in self.error_set and (eventmask & IOMultiplex.ERROR) == False:
             self.read_set.remove(fd)
 
         self.register(fd, eventmask)
@@ -139,13 +140,13 @@ class _Select(object):
         events = {}
 
         for fd in read_list:
-            events[fd] = events.get(fd, 0) | READ
+            events[fd] = events.get(fd, 0) | IOMultiplex.READ
 
         for fd in write_list:
-            events[fd] = events.get(fd, 0) | WRITE
+            events[fd] = events.get(fd, 0) | IOMultiplex.WRITE
 
         for fd in error_list:
-            events[fd] = events.get(fd, 0) | ERROR
+            events[fd] = events.get(fd, 0) | IOMultiplex.ERROR
 
         return events
 
