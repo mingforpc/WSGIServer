@@ -27,7 +27,7 @@ import select
 import logging
 
 logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s : ',
+                    format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s: %(message)s ',
                     datefmt='%a, %d %b %Y %H:%M:%S')
 
 EPOLLIN = 0x001
@@ -91,7 +91,7 @@ class IOMultiplex(object):
                 try:
                     self._handler[fd](fd, event)
                 except Exception as ex:
-                    logging.error(str(ex))
+                    logging.error(ex)
 
     def stop(self):
         self.running = False
@@ -113,13 +113,13 @@ class _Select(object):
             self.error_set.add(fd)
 
     def modify(self, fd, eventmask):
-        if fd in self.read_set and (eventmask & IOMultiplex.READ) == False:
+        if fd in self.read_set and (eventmask & IOMultiplex.READ) is False:
             self.read_set.remove(fd)
 
-        if fd in self.write_set and (eventmask & IOMultiplex.WRITE) == False:
+        if fd in self.write_set and (eventmask & IOMultiplex.WRITE) is False:
             self.read_set.remove(fd)
 
-        if fd in self.error_set and (eventmask & IOMultiplex.ERROR) == False:
+        if fd in self.error_set and (eventmask & IOMultiplex.ERROR) is False:
             self.read_set.remove(fd)
 
         self.register(fd, eventmask)

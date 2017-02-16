@@ -1,14 +1,15 @@
-from django.conf.urls import patterns, include, url
+from django.conf.urls import url, include
 from django.contrib import admin
 
-urlpatterns = patterns(
-    '',
+from server.helloworld.helloworld import views
+
+urlpatterns = [
     # Examples:
     # url(r'^$', 'helloworld.views.home', name='home'),
     # url(r'^blog/', include('blog.urls')),
 
     url(r'^admin/', include(admin.site.urls)),
 
-    (r'^hello', 'helloworld.views.index'),
+    url(r'^hello', views.index),
 
-)
+]

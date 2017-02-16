@@ -24,7 +24,7 @@ from __future__ import nested_scopes
 from __future__ import generators
 
 import time
-from types import ListType
+# from types import ListType
 
 # Weekday and month names for HTTP date/time formatting; always English!
 _weekdayname = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]

@@ -48,9 +48,9 @@ MIDDLEWARE_CLASSES = (
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 )
 
-ROOT_URLCONF = 'helloworld.urls'
+ROOT_URLCONF = 'server.helloworld.helloworld.urls'
 
-WSGI_APPLICATION = 'helloworld.wsgi.application'
+WSGI_APPLICATION = 'server.helloworld.helloworld.wsgi.application'
 
 
 # Database
