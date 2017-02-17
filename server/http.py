@@ -17,24 +17,26 @@
 
 from __future__ import absolute_import
 from __future__ import division
+from __future__ import generators
+from __future__ import nested_scopes
 from __future__ import print_function
 from __future__ import unicode_literals
 from __future__ import with_statement
-from __future__ import nested_scopes
-from __future__ import generators
 
-import socket
-import atexit
-import logging
+from server.io_multiplex import IOMultiplex
+
+# import atexit
 import errno
+import logging
+import socket
 
 try:
     import cStringIO as StringIO
 except (Exception, ):
     import StringIO
 
-from server.io_multiplex import IOMultiplex
-from server.request import WSGIRequest
+# from server.io_multiplex import IOMultiplex
+# from server.request import WSGIRequest
 
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s : ',
@@ -620,14 +622,14 @@ class WSGIServer(object):
             self.__socket.setblocking(flag)
 
 
-if __name__ == "__main__":
-    server = WSGIServer(WSGIRequest, "0.0.0.0", 8888)
-    server.set_blocking(0)
-    # server = WSGIServer(HTTPRequest, '', 8888)
-    from server.helloworld.helloworld.wsgi import application as app
-    atexit.register(server.close)
-    server.set_app(app)
-    print("start")
-    server.start()
-    print("IO Started")
-    IOMultiplex.initialized().start()
+# if __name__ == "__main__":
+#     server = WSGIServer(WSGIRequest, "0.0.0.0", 8888)
+#     server.set_blocking(0)
+#     # server = WSGIServer(HTTPRequest, '', 8888)
+#     from test.helloworld.helloworld.wsgi import application as app
+#     atexit.register(server.close)
+#     server.set_app(app)
+#     print("start")
+#     server.start()
+#     print("IO Started")
+#     IOMultiplex.initialized().start()
