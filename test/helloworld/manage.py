@@ -14,21 +14,12 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
-
-from server.http import WSGIServer
-from server.request import WSGIRequest
-from server.io_multiplex import IOMultiplex
-
-import atexit
+import os
+import sys
 
 if __name__ == "__main__":
-    server = WSGIServer(WSGIRequest, "0.0.0.0", 8888)
-    server.set_blocking(0)
-    # server = WSGIServer(HTTPRequest, '', 8888)
-    from test.helloworld.helloworld.wsgi import application as app
-    atexit.register(server.close)
-    server.set_app(app)
-    print("start")
-    server.start()
-    print("IO Started")
-    IOMultiplex.initialized().start()
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "helloworld.settings")
+
+    from django.core.management import execute_from_command_line
+
+    execute_from_command_line(sys.argv)

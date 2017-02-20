@@ -28,18 +28,16 @@ from server.header import ResponseHeaders, RequestHeaders
 from server.header import format_date_time
 from server.response import SimpleResponse
 
-import logging
 import time
 import sys
+
+from server.log import logging
 
 try:
     import cStringIO as StringIO
 except (Exception, ):
     import StringIO
 
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s : ',
-                    datefmt='%a, %d %b %Y %H:%M:%S')
 
 class HTTPRequest(object):
     """

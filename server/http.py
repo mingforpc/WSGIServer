@@ -25,23 +25,15 @@ from __future__ import with_statement
 
 from server.io_multiplex import IOMultiplex
 
-# import atexit
 import errno
-import logging
 import socket
+
+from server.log import logging
 
 try:
     import cStringIO as StringIO
 except (Exception, ):
     import StringIO
-
-# from server.io_multiplex import IOMultiplex
-# from server.request import WSGIRequest
-
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s : ',
-                    datefmt='%a, %d %b %Y %H:%M:%S')
-
 
 # class HTTPRequest(object):
 #     """

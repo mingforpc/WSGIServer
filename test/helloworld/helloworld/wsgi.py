@@ -15,20 +15,17 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from server.http import WSGIServer
-from server.request import WSGIRequest
-from server.io_multiplex import IOMultiplex
+"""
+WSGI config for helloworld project.
 
-import atexit
+It exposes the WSGI callable as a module-level variable named ``application``.
 
-if __name__ == "__main__":
-    server = WSGIServer(WSGIRequest, "0.0.0.0", 8888)
-    server.set_blocking(0)
-    # server = WSGIServer(HTTPRequest, '', 8888)
-    from test.helloworld.helloworld.wsgi import application as app
-    atexit.register(server.close)
-    server.set_app(app)
-    print("start")
-    server.start()
-    print("IO Started")
-    IOMultiplex.initialized().start()
+For more information on this file, see
+https://docs.djangoproject.com/en/1.7/howto/deployment/wsgi/
+"""
+
+import os
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "test.helloworld.helloworld.settings")
+
+from django.core.wsgi import get_wsgi_application
+application = get_wsgi_application()

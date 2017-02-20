@@ -24,11 +24,8 @@ from __future__ import nested_scopes
 from __future__ import generators
 
 import select
-import logging
+from server.log import logging
 
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s: %(message)s ',
-                    datefmt='%a, %d %b %Y %H:%M:%S')
 
 EPOLLIN = 0x001
 EPOLLPRI = 0x002
@@ -91,7 +88,7 @@ class IOMultiplex(object):
                 try:
                     self._handler[fd](fd, event)
                 except Exception as ex:
-                    logging.error(ex)
+                    logging.exception(ex)
 
     def stop(self):
         self.running = False

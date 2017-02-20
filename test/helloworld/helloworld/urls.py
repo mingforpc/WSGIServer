@@ -15,20 +15,18 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from server.http import WSGIServer
-from server.request import WSGIRequest
-from server.io_multiplex import IOMultiplex
+from django.conf.urls import url, include
+from django.contrib import admin
 
-import atexit
+from test.helloworld.helloworld import views
 
-if __name__ == "__main__":
-    server = WSGIServer(WSGIRequest, "0.0.0.0", 8888)
-    server.set_blocking(0)
-    # server = WSGIServer(HTTPRequest, '', 8888)
-    from test.helloworld.helloworld.wsgi import application as app
-    atexit.register(server.close)
-    server.set_app(app)
-    print("start")
-    server.start()
-    print("IO Started")
-    IOMultiplex.initialized().start()
+urlpatterns = [
+    # Examples:
+    # url(r'^$', 'helloworld.views.home', name='home'),
+    # url(r'^blog/', include('blog.urls')),
+
+    url(r'^admin/', include(admin.site.urls)),
+
+    url(r'^hello', views.index),
+
+]
