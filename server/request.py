@@ -27,6 +27,7 @@ from traceback import print_exception
 from server.header import ResponseHeaders, RequestHeaders
 from server.header import format_date_time
 from server.response import SimpleResponse
+from server.exception.request_exception import ReadBlankException
 
 import time
 import sys
@@ -70,9 +71,11 @@ class HTTPRequest(object):
         self.body = None
 
     def handle_one_request(self):
-        self.parse_request()
         try:
+            self.parse_request()
             self.handle_request()
+        except ReadBlankException as ex:
+            logging.error(ex)
         except Exception as ex:
             # print log here
             logging.error(ex)
@@ -87,6 +90,11 @@ class HTTPRequest(object):
         start_line = self.rfile.readline(HTTPRequest.MAX_URL_SIZE)
         start_line = start_line.replace('\r\n', '\n').replace('\r', '\n')
         logging.debug(start_line)
+
+        # Check if read blank string
+        if start_line == "":
+            raise ReadBlankException("Get blank data from client socket")
+
         self.commond, self.path, self.query, self.version = HTTPRequest.__parse_startline(start_line)
 
         self.headers = RequestHeaders(HTTPRequest.__parse_header(self.rfile))
