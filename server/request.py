@@ -24,12 +24,11 @@ from __future__ import nested_scopes
 from __future__ import generators
 
 from traceback import print_exception
-from server.header import ResponseHeaders, RequestHeaders
-from server.header import format_date_time
+from server.header import RequestHeaders
+from server.response import WsgiResponse
 from server.response import SimpleResponse
 from server.exception.request_exception import ReadBlankException
 
-import time
 import sys
 
 from server.log import logging
@@ -71,17 +70,19 @@ class HTTPRequest(object):
         self.body = None
 
     def handle_one_request(self):
+        response = None
         try:
             self.parse_request()
-            self.handle_request()
+            response = self.handle_request()
         except ReadBlankException as ex:
             logging.error(ex)
         except Exception as ex:
             # print log here
             logging.error(ex)
-            self.send_simple_response(500)
+            response = WsgiResponse(500, "", "")
+            # self.send_simple_response(500)
         finally:
-            self.close()
+            return response
 
     def parse_request(self):
         """
@@ -202,31 +203,32 @@ class WSGIRequest(HTTPRequest):
 
         self.stderr = None
 
-        # For write() and startResponse()
         self.result = None
-        self.header_sent = False
         self.response_status = None
         self.response_headers = None
-        self.bytes_sent = 0
 
     def handle_request(self):
         """
         Call the function run() to invoke wsgi application
         :return:
         """
-        self.run()
+        response = self.run()
+        return response
 
     def run(self):
+
         try:
             environ = self.getenv()
             self.result = self.application(environ, self.start_response)
-
-            self.finish_response()
-        except:
+        except (Exception, ) as ex:
             try:
                 self.handle_error()
             except:
                 self.close()
+
+        finally:
+            response = WsgiResponse(self.response_status, self.response_headers, self.result)
+            return response
 
     def getenv(self):
         """ Get the environ """
@@ -280,90 +282,19 @@ class WSGIRequest(HTTPRequest):
     def start_response(self, status, response_headers, excInfo=None):
         if excInfo:
             try:
-                if self.header_sent:
-                    raise (excInfo[0], excInfo[1], excInfo[2])
+                raise(excInfo[0], excInfo[1], excInfo[2])
             finally:
                 excInfo = None
-        elif self.header_sent:
-            raise AssertionError("Headers already set!")
 
         self.response_status = status
         logging.debug(response_headers)
-        self.response_headers = ResponseHeaders.get_headers(response_headers)
+        self.response_headers = response_headers
         return self.write
-
-    def write(self, data):
-        if not self.response_status:
-            raise AssertionError("write() before start_response()")
-        if not self.header_sent:
-            self.bytes_sent = len(data)
-            self.send_headers()
-        else:
-            self.bytes_sent += len(data)
-
-        self.__write(data)
-        self.__flush()
-
-    def send_headers(self):
-        """ Send response header to client """
-        self.header_sent = True
-        self.setup_header()
-
-        self.send_preamble()
-        self.__write(self.response_headers)
-
-    def setup_header(self):
-        """ Make necessary header changes """
-        if "Content-Length" not in self.response_headers:
-            self.set_content_length()
-
-    def set_content_length(self):
-        """ Get the Content-Length if possible """
-        if 'Content-Length' not in self.response_headers:
-            try:
-                blocks = len(self.result)
-            except (TypeError, AttributeError, NotImplementedError):
-                self.response_headers["Content-Length"] = str(self.bytes_sent)
-            else:
-                if blocks == 1:
-                    self.response_headers["Content-Length"] = str(self.bytes_sent)
-
-    def send_preamble(self):
-        """ Send version/status/date/server to client """
-        self.__write('HTTP/%s %s\r\n' % (self.version, self.response_status))
-        if "Date" not in self.response_headers:
-            self.__write("Date: %s\r\n" % format_date_time(time.time()))
-
-        if self.server.server_software and "Server" not in self.response_headers:
-            self.__write("Server: %s\r\n" % self.server.server_software)
-
-    def finish_response(self):
-        """ Send the iterable data, then close self and the iterable data
-        """
-        try:
-            for data in self.result:
-                self.write(data)
-            self.finish_content()
-        finally:
-            self.close()
-
-    def finish_content(self):
-        """Ensure headers and content have both been sent"""
-        if not self.header_sent:
-            # Only zero Content-Length if not set by the application (so
-            # that HEAD requests can be satisfied properly, see #3839)
-            if self.response_headers.get('Content-Length') is None:
-                self.response_headers.set_header('Content-Length', 0)
-            self.send_headers()
-        else:
-            pass  # XXX check if content-length was too short?
 
     def handle_error(self):
         """ Send error output to client if possible """
         self.log_exception(sys.exc_info())
-        if not self.header_sent:
-            self.result = self.error_output(self.environ, self.start_response)
-            self.finish_response()
+        self.result = self.error_output(self.environ, self.start_response)
 
     def log_exception(self, exc_info):
         """
@@ -375,29 +306,3 @@ class WSGIRequest(HTTPRequest):
             print_exception(exc_info[0], exc_info[1], exc_info[2], None, self.stderr)
         finally:
             exc_info = None
-
-    def error_output(self, environ, start_response):
-        """
-
-        :param environ:
-        :param start_response:
-        :return error_body:
-        """
-        start_response(self.error_status, self.error_headers, sys.exc_info())
-        return [self.error_body]
-
-    def set_stderr(self, stderr):
-        """
-        Set the stderr for error out put
-        :param stderr:
-        :return:
-        """
-        self.stderr = stderr
-
-    def __write(self, data):
-        self.wfile.write(data)
-        self._write = self.wfile.write
-
-    def __flush(self):
-        self.wfile.flush()
-        self._flush = self.wfile.flush

@@ -23,6 +23,12 @@ from __future__ import with_statement
 from __future__ import nested_scopes
 from __future__ import generators
 
+import time
+from server.http import server_software
+
+from server.header import ResponseHeaders
+from server.header import format_date_time
+
 try:
     import cStringIO as StringIO
 except (Exception, ):
@@ -141,3 +147,91 @@ class SimpleResponse(object):
 
     def __repr__(self):
         return self.to_string()
+
+
+class WsgiResponse(object):
+
+    def __init__(self, status, headers, result):
+        self.status = status
+        self.headers = headers
+        self.result = result
+
+        self.bytes_sent = 0
+
+        # The flag to indicate if headers send client
+        self._send_header = False
+
+        self.wfile = None
+
+        self.version = "1.1"
+
+    def set_wfile(self, wfile):
+        self.wfile = wfile
+
+    def handle_response(self):
+        """
+
+        :return:
+        """
+        self.headers = ResponseHeaders.get_headers(self.headers)
+        self.finish_response()
+
+    def finish_response(self):
+        """ Send the iterable data, then close self and the iterable data
+        """
+        # try:
+        for data in self.result:
+            self.write(data)
+        # finally:
+        #     self.close()
+
+    def write(self, data):
+        if not self._send_header:
+            self.bytes_sent = len(data)
+            self.send_headers()
+        else:
+            self.bytes_sent += len(data)
+
+        self.__write(data)
+        self.__flush()
+
+    def send_headers(self):
+        """ Send response preamble and header  to client"""
+        self._send_header = True
+        self.setup_headers()
+
+        self.send_preamble()
+        self.__write(self.headers)
+
+    def setup_headers(self):
+        """ Make necessary header here """
+        if 'Content-Length' not in self.headers:
+            self.set_content_length()
+
+    def set_content_length(self):
+        """ Set Content-Length in header """
+        if 'Content-Length' not in self.headers:
+            try:
+                length = len(self.result)
+            except (TypeError, AttributeError, NotImplementedError):
+                self.headers["Content-Length"] = str(self.bytes_sent)
+            else:
+                if length == 1:
+                    self.headers["Content-Length"] = str(self.bytes_sent)
+
+    def send_preamble(self):
+        """ Send version/status/date/server to client """
+        self.__write('HTTP/%s %s\r\n' % (self.version, self.status))
+        if "Date" not in self.headers:
+            self.__write("Date: %s\r\n" % format_date_time(time.time()))
+
+        if server_software and "Server" not in self.headers:
+            self.__write("Server: %s\r\n" % server_software)
+
+    def __write(self, data):
+        self.wfile.write(data)
+        self._write = self.wfile.write
+
+    def __flush(self):
+        self.wfile.flush()
+        self._flush = self.wfile.flush

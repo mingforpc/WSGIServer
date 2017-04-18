@@ -63,18 +63,18 @@ class IOMultiplex(object):
         self.loop = _epoll()
 
         self.__events = {}
-        self._handler = {}
+        self.__handler = {}
 
         self.running = False
 
         self.timeout = 1
 
     def add_handler(self, fd, handler, eventmask):
-        self._handler[fd] = handler
+        self.__handler[fd] = handler
         self.loop.register(fd, eventmask)
 
     def remove_handler(self, fd):
-        del self._handler[fd]
+        del self.__handler[fd]
         self.loop.unregister(fd)
 
     def start(self):
@@ -86,7 +86,9 @@ class IOMultiplex(object):
 
             for fd, event in self.__events.items():
                 try:
-                    self._handler[fd](fd, event)
+                    # if fd not in self.__handler:
+                    #     continue
+                    self.__handler[fd](fd, event)
                 except Exception as ex:
                     logging.exception(ex)
 
@@ -126,10 +128,10 @@ class _Select(object):
             self.read_set.remove(fd)
 
         if fd in self.write_set:
-            self.read_set.remove(fd)
+            self.write_set.remove(fd)
 
         if fd in self.error_set:
-            self.read_set.remove(fd)
+            self.error_set.remove(fd)
 
     def poll(self, timeout):
         read_list, write_list, error_list = select.select(self.read_set, self.write_set, self.error_set, timeout)
