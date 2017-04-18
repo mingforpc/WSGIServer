@@ -230,8 +230,8 @@ class WsgiResponse(object):
 
     def __write(self, data):
         self.wfile.write(data)
-        self._write = self.wfile.write
+        self.__write = self.wfile.write
 
     def __flush(self):
         self.wfile.flush()
-        self._flush = self.wfile.flush
+        self.__flush = self.wfile.flush
