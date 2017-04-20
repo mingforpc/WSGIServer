@@ -24,7 +24,7 @@ from __future__ import nested_scopes
 from __future__ import generators
 
 import time
-from server.http import server_software
+from server import SERVER
 
 from server.header import ResponseHeaders
 from server.header import format_date_time
@@ -225,8 +225,8 @@ class WsgiResponse(object):
         if "Date" not in self.headers:
             self.__write("Date: %s\r\n" % format_date_time(time.time()))
 
-        if server_software and "Server" not in self.headers:
-            self.__write("Server: %s\r\n" % server_software)
+        if SERVER and "Server" not in self.headers:
+            self.__write("Server: %s\r\n" % SERVER)
 
     def __write(self, data):
         self.wfile.write(data)

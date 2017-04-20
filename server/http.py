@@ -35,17 +35,14 @@ try:
 except (Exception, ):
     import StringIO
 
-server_software = "Test Server"
-
 
 class WSGIServer(object):
 
-    server_software = "Test Server"
-
-    def __init__(self, handler, host=None, port=None):
+    def __init__(self, handler, host=None, port=None, keep_alive=True):
         self.host = host
         self.port = port
         self.handler = handler
+        self.keep_alive = keep_alive
 
         self.server_name = ""
 
@@ -126,13 +123,15 @@ class WSGIServer(object):
         if response is not None:
             response.set_wfile(wfile)
             response.handle_response()
-        else:
-            print(response)
 
         del self.response_list[fd]
         self.multiplex.remove_handler(fd)
 
-        # self.multiplex.add_handler(fd=conn.fileno(), handler=self.handle_read_request, eventmask=IOMultiplex.READ)
+        if self.keep_alive:
+            self.multiplex.add_handler(fd=conn.fileno(), handler=self.handle_read_request, eventmask=IOMultiplex.READ)
+        else:
+            del self.connection_list[fd]
+            conn.close()
 
     def bind(self, host, port):
         """ Bind host and port to server socket """

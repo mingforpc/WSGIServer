@@ -24,6 +24,7 @@ from __future__ import nested_scopes
 from __future__ import generators
 
 from traceback import print_exception
+from server import SERVER
 from server.header import RequestHeaders
 from server.response import WsgiResponse
 from server.response import SimpleResponse
@@ -245,8 +246,7 @@ class WSGIRequest(HTTPRequest):
         else:
             environ["wsgi.url_scheme"] = "http"
 
-        if self.server.server_software:
-            environ['SERVER_SOFTWARE'] = self.server.server_software
+        environ['SERVER_SOFTWARE'] = SERVER
 
         # CGI environ
         self.set_cgi_environ(environ)
