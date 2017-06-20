@@ -25,6 +25,8 @@ from __future__ import generators
 
 from traceback import print_exception
 from server import SERVER
+from server.err_code import ERR_SUCCESS, ERR_NULL_REQUEST, ERR_INTERNAL_EXCEPTION
+from server.err_code import get_err_msg
 from server.header import RequestHeaders
 from server.response import WsgiResponse
 from server.response import SimpleResponse
@@ -71,19 +73,25 @@ class HTTPRequest(object):
         self.body = None
 
     def handle_one_request(self):
+        err = ERR_SUCCESS
+        err_msg = get_err_msg(ERR_SUCCESS)
         response = None
         try:
             self.parse_request()
             response = self.handle_request()
         except ReadBlankException as ex:
-            logging.error(ex)
+            # Get blank request
+            err = ERR_NULL_REQUEST
+            err_msg = get_err_msg(err)
         except Exception as ex:
             # print log here
-            logging.error(ex)
+            logging.error("Exception while parse request: %s", ex)
+            err = ERR_INTERNAL_EXCEPTION
+            err_msg = get_err_msg(err)
             response = WsgiResponse(500, "", "")
-            # self.send_simple_response(500)
+
         finally:
-            return response
+            return err, err_msg, response
 
     def parse_request(self):
         """
@@ -91,7 +99,7 @@ class HTTPRequest(object):
         """
         start_line = self.rfile.readline(HTTPRequest.MAX_URL_SIZE)
         start_line = start_line.replace('\r\n', '\n').replace('\r', '\n')
-        logging.debug(start_line)
+        logging.debug("start_line: %s", start_line)
 
         # Check if read blank string
         if start_line == "":

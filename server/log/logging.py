@@ -29,7 +29,7 @@ import sys
 logger = logging.getLogger("server_logger")
 logger.setLevel(logging.DEBUG)
 
-formatter = logging.Formatter(fmt='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s : ',
+formatter = logging.Formatter(fmt='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s: %(message)s',
                               datefmt='%a, %d %b %Y %H:%M:%S')
 
 ch = logging.StreamHandler()

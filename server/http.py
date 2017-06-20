@@ -24,7 +24,8 @@ from __future__ import unicode_literals
 from __future__ import with_statement
 
 from server.io_multiplex import IOMultiplex
-
+from server.request import WSGIRequest
+from server.err_code import ERR_NULL_REQUEST
 import errno
 import socket
 
@@ -38,13 +39,14 @@ except (Exception, ):
 
 class WSGIServer(object):
 
-    def __init__(self, handler, host=None, port=None, keep_alive=True):
+    def __init__(self, host=None, port=None, keep_alive=True):
         self.host = host
         self.port = port
-        self.handler = handler
         self.keep_alive = keep_alive
 
         self.server_name = ""
+
+        self.handler = WSGIRequest
 
         self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -67,6 +69,9 @@ class WSGIServer(object):
         self.response_list = {}
 
     def start(self):
+
+        if self.application is None:
+            raise Exception("application is None!")
 
         self.multiplex.add_handler(fd=self.__socket.fileno(), handler=self.handle_connection,
                                    eventmask=IOMultiplex.READ)
@@ -110,13 +115,19 @@ class WSGIServer(object):
         rfile = conn.makefile("rb")
         wfile = conn.makefile("wb")
         request_handler = self.handler(self, rfile, wfile, addr)
-        response = request_handler.handle_one_request()
+        err, msg, response = request_handler.handle_one_request()
         self.multiplex.remove_handler(fd)
 
-        self.response_list[fd] = response
-        self.multiplex.add_handler(fd=fd, handler=self.hanlde_write_response, eventmask=IOMultiplex.WRITE)
+        if err == ERR_NULL_REQUEST:
+            # Get blank request, re-put it into read
+            logging.error("Get blank request from fd[%d]", fd)
+            # self.multiplex.add_handler(fd=conn.fileno(), handler=self.handle_read_request, eventmask=IOMultiplex.READ)
+            return
 
-    def hanlde_write_response(self, fd, event):
+        self.response_list[fd] = response
+        self.multiplex.add_handler(fd=fd, handler=self.handle_write_response, eventmask=IOMultiplex.WRITE)
+
+    def handle_write_response(self, fd, event):
         conn, addr = self.connection_list[fd]
         wfile = conn.makefile("wb")
         response = self.response_list[fd]
