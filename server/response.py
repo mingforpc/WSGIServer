@@ -119,9 +119,10 @@ class HttpResponse(object):
 class WsgiResponse(HttpResponse):
 
     @classmethod
-    def make_response(cls, status):
-        content = cls.RESPONSE_STATUS.get(status)
+    def make_response(cls, status_code):
+        content = cls.RESPONSE_STATUS.get(status_code)
         content = content[1] if content is not None else ""
+        status = "%d %s" %(status_code, content)
         response = WsgiResponse(status, None, content)
         return response
 
@@ -196,7 +197,7 @@ class WsgiResponse(HttpResponse):
 
     def send_preamble(self):
         """ Send version/status/date/server to client """
-        self.__write('HTTP/%s %s %s\r\n' % (self.version, self.status, self.RESPONSE_STATUS.get(self.status)[0]))
+        self.__write('HTTP/%s %s\r\n' % (self.version, self.status))
         if "Date" not in self.headers:
             self.__write("Date: %s\r\n" % format_date_time(time.time()))
 

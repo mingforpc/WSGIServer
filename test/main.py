@@ -22,7 +22,7 @@ from server.io_multiplex import IOMultiplex
 import atexit
 
 if __name__ == "__main__":
-    server = WSGIServer("0.0.0.0", 8888)
+    server = WSGIServer("0.0.0.0", 8889)
     server.set_blocking(0)
     # server = WSGIServer(HTTPRequest, '', 8888)
     from test.helloworld.helloworld.wsgi import application as app
