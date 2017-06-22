@@ -25,7 +25,7 @@ from __future__ import with_statement
 
 from server.io_multiplex import IOMultiplex
 from server.request import WSGIRequest
-from server.err_code import ERR_NULL_REQUEST
+from server.err_code import ERR_NULL_REQUEST, ERR_100_CONTINUE_REQUEST
 import errno
 import socket
 
@@ -67,6 +67,15 @@ class WSGIServer(object):
 
         self.connection_list = {}
         self.response_list = {}
+
+        # 100 continue request
+        # This list of request just has start line and header
+        # without body
+        self.continue_request_list = {}
+
+        # 100 continue response
+        # This list of response to send 100 continue
+        self.continue_response_list = {}
 
     def start(self):
 
@@ -111,18 +120,35 @@ class WSGIServer(object):
 
     def handle_read_request(self, fd, event):
         """ Temporarily function """
-        conn, addr = self.connection_list[fd]
-        rfile = conn.makefile("rb")
-        wfile = conn.makefile("wb")
-        request_handler = self.handler(self, rfile, wfile, addr)
-        err, msg, response = request_handler.handle_one_request()
-        self.multiplex.remove_handler(fd)
 
-        if err == ERR_NULL_REQUEST:
-            # Get blank request, re-put it into read
-            logging.error("Get blank request from fd[%d]", fd)
-            # self.multiplex.add_handler(fd=conn.fileno(), handler=self.handle_read_request, eventmask=IOMultiplex.READ)
-            return
+        # To check if is the 100 continue request
+        if fd in self.continue_request_list:
+            conn, addr = self.connection_list[fd]
+            rfile = conn.makefile("rb")
+            wfile = conn.makefile("wb")
+            request = self.continue_request_list[fd]
+            request.rfile = rfile
+            request.wfile = wfile
+            err, msg, response = request.handle_one_request()
+        else:
+            conn, addr = self.connection_list[fd]
+            rfile = conn.makefile("rb")
+            wfile = conn.makefile("wb")
+            request_handler = self.handler(self, rfile, wfile, addr)
+            err, msg, response = request_handler.handle_one_request()
+            self.multiplex.remove_handler(fd)
+
+            if err == ERR_NULL_REQUEST:
+                # Get blank request, re-put it into read
+                logging.error("Get blank request from fd[%d]", fd)
+                # self.multiplex.add_handler(fd=conn.fileno(), handler=self.handle_read_request, eventmask=IOMultiplex.READ)
+                return
+
+            if err == ERR_100_CONTINUE_REQUEST:
+                # Retrun 100 continue response to client
+                logging.info("Get 100 continue request from fd[%d]", fd)
+                self.continue_request_list[fd] = request_handler
+                self.multiplex.add_handler(fd=conn.fileno(), handler=self.handle_read_request, eventmask=IOMultiplex.READ)
 
         self.response_list[fd] = response
         self.multiplex.add_handler(fd=fd, handler=self.handle_write_response, eventmask=IOMultiplex.WRITE)

@@ -25,12 +25,11 @@ from __future__ import generators
 
 from traceback import print_exception
 from server import SERVER
-from server.err_code import ERR_SUCCESS, ERR_NULL_REQUEST, ERR_INTERNAL_EXCEPTION
+from server.err_code import ERR_SUCCESS, ERR_NULL_REQUEST, ERR_INTERNAL_EXCEPTION, ERR_100_CONTINUE_REQUEST
 from server.err_code import get_err_msg
 from server.header import RequestHeaders
 from server.response import WsgiResponse
-from server.response import SimpleResponse
-from server.exception.request_exception import ReadBlankException
+from server.exception.request_exception import ReadBlankException, RequestContinueException
 
 import sys
 
@@ -69,6 +68,7 @@ class HTTPRequest(object):
         # request header
         self.headers = None
 
+        self.content_length = None
         # request body
         self.body = None
 
@@ -83,13 +83,42 @@ class HTTPRequest(object):
             # Get blank request
             err = ERR_NULL_REQUEST
             err_msg = get_err_msg(err)
+        except RequestContinueException as ex:
+            # Get 100 continue request
+            err = ERR_100_CONTINUE_REQUEST
+            err_msg = get_err_msg(err)
+            response = WsgiResponse.make_response(100)
         except Exception as ex:
             # print log here
             logging.error("Exception while parse request: %s", ex)
             err = ERR_INTERNAL_EXCEPTION
             err_msg = get_err_msg(err)
-            response = WsgiResponse(500, "", "")
+            response = WsgiResponse.make_response(500)
 
+        finally:
+            return err, err_msg, response
+
+    def handle_100_continue(self):
+        """
+        Process after get 100 continue header. Read body from steam
+        :return:
+        """
+        err = ERR_SUCCESS
+        err_msg = get_err_msg(ERR_SUCCESS)
+        response = None
+
+        self.body = HTTPRequest.__parse_body(self.rfile, self.content_length)
+        logging.debug("request body: %s", self.body.getvalue())
+
+        try:
+            self.parse_request()
+            response = self.handle_request()
+        except Exception as ex:
+            # print log here
+            logging.error("Exception while parse request: %s", ex)
+            err = ERR_INTERNAL_EXCEPTION
+            err_msg = get_err_msg(err)
+            response = WsgiResponse.make_response(500)
         finally:
             return err, err_msg, response
 
@@ -97,6 +126,7 @@ class HTTPRequest(object):
         """
         Parse the http struct from 'rfile'
         """
+
         start_line = self.rfile.readline(HTTPRequest.MAX_URL_SIZE)
         start_line = start_line.replace('\r\n', '\n').replace('\r', '\n')
         logging.debug("start_line: %s", start_line)
@@ -108,15 +138,17 @@ class HTTPRequest(object):
         self.commond, self.path, self.query, self.version = HTTPRequest.__parse_startline(start_line)
 
         self.headers = RequestHeaders(HTTPRequest.__parse_header(self.rfile))
-        logging.debug(self.headers)
+        logging.debug("header: %s", self.headers)
+
+        self.content_length = int(self.headers.get("Content-Length", 0))
 
         # Process 'Expect' header with value "100-continue"
-        if self.headers.get("Expect") is not None and self.headers.get("Expect") == "100-continue":
-            self.send_simple_response(100)
+        if self.headers.get("Expect") is not None and self.headers.get("Expect") == "100 Continue":
+            # self.send_simple_response(100)
+            raise RequestContinueException("Get 100 continue request")
 
-        content_length = int(self.headers.get("Content-Length", 0))
-        self.body = HTTPRequest.__parse_body(self.rfile, content_length)
-        logging.debug(self.body.getvalue())
+        self.body = HTTPRequest.__parse_body(self.rfile, self.content_length)
+        logging.debug("request body: %s", self.body.getvalue())
 
     def handle_request(self):
         """
@@ -156,7 +188,8 @@ class HTTPRequest(object):
                 break
 
             header, value = one_line.split(':', 1)
-            headers[header] = value
+            a = ''
+            headers[header] = value.strip('\r\n').strip('\n').strip()
 
         return headers
 
@@ -190,16 +223,16 @@ class HTTPRequest(object):
         self.rfile.close()
         self.wfile.close()
 
-    def send_simple_response(self, status, header=[('Content-Type', 'text/plain',), ]):
-        """
-        Return a simple response to client
-        :param status: the status code
-        :param header: http header
-        :return:
-        """
-        response = SimpleResponse(status, self.version, header, "")
-        self.__write(response)
-        self.__flush()
+    # def send_simple_response(self, status, header=[('Content-Type', 'text/plain',), ]):
+    #     """
+    #     Return a simple response to client
+    #     :param status: the status code
+    #     :param header: http header
+    #     :return:
+    #     """
+    #     response = SimpleResponse(status, self.version, header, "")
+    #     self.__write(response)
+    #     self.__flush()
 
 
 class WSGIRequest(HTTPRequest):
@@ -229,14 +262,12 @@ class WSGIRequest(HTTPRequest):
         try:
             environ = self.getenv()
             self.result = self.application(environ, self.start_response)
+            response = WsgiResponse(self.response_status, self.response_headers, self.result)
         except (Exception, ) as ex:
-            try:
-                self.handle_error()
-            except:
-                self.close()
+            logging.error('Exception in run(): %s', ex)
+            response = WsgiResponse.make_response(500)
 
         finally:
-            response = WsgiResponse(self.response_status, self.response_headers, self.result)
             return response
 
     def getenv(self):
@@ -295,22 +326,22 @@ class WSGIRequest(HTTPRequest):
                 excInfo = None
 
         self.response_status = status
-        logging.debug(response_headers)
+        logging.debug("response header: %s", response_headers)
         self.response_headers = response_headers
         return self.write
 
-    def handle_error(self):
-        """ Send error output to client if possible """
-        self.log_exception(sys.exc_info())
-        self.result = self.error_output(self.environ, self.start_response)
+    # def handle_error(self):
+    #     """ Send error output to client if possible """
+    #     self.log_exception(sys.exc_info())
+    #     self.result = self.error_output(self.environ, self.start_response)
 
-    def log_exception(self, exc_info):
-        """
-        Log the exc_info to server log by stderr
-        Can override this method to change the format
-        :param exc_info:
-        """
-        try:
-            print_exception(exc_info[0], exc_info[1], exc_info[2], None, self.stderr)
-        finally:
-            exc_info = None
+    # def log_exception(self, exc_info):
+    #     """
+    #     Log the exc_info to server log by stderr
+    #     Can override this method to change the format
+    #     :param exc_info:
+    #     """
+    #     try:
+    #         print_exception(exc_info[0], exc_info[1], exc_info[2], None, self.stderr)
+    #     finally:
+    #         exc_info = None

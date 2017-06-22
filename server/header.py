@@ -111,8 +111,9 @@ class ResponseHeaders(Headers):
     @staticmethod
     def get_headers(headers):
         response_headers = ResponseHeaders()
-        for header in headers:
-            k, v = header
-            response_headers[k] = v
+        if headers is not None:
+            for header in headers:
+                k, v = header
+                response_headers[k] = v
 
         return response_headers

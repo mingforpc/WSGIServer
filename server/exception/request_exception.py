@@ -20,3 +20,9 @@ class ReadBlankException(Exception):
     """
     Raise a exception about read blank data from client socket
     """
+
+
+class RequestContinueException(Exception):
+    """
+    Raise a exception which request has Except: 100-continue header
+    """
