@@ -49,6 +49,7 @@ class WSGIServer(object):
         self.handler = WSGIRequest
 
         self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.__socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
         self.base_environ = {}
 
